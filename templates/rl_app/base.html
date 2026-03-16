@@ -1,0 +1,221 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RL Training Lab{% endblock %} | UBA MIA 2026</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #1c2128;
+            --border-color: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #7ee787;
+            --accent-orange: #f78166;
+            --accent-purple: #d2a8ff;
+            --accent-red: #ff7b72;
+            --accent-yellow: #ffd700;
+            --glass-bg: rgba(22, 27, 34, 0.8);
+            --glass-border: rgba(48, 54, 61, 0.6);
+        }
+        * { font-family: 'Inter', system-ui, sans-serif; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .navbar {
+            background: linear-gradient(135deg, rgba(13,17,23,0.97) 0%, rgba(22,27,34,0.97) 100%) !important;
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.3rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .nav-link { color: var(--text-secondary) !important; font-weight: 500; transition: color 0.2s; }
+        .nav-link:hover, .nav-link.active { color: var(--accent-blue) !important; }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+        .glass-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+            border-color: var(--accent-blue);
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .stat-label { color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .badge-mc { background: linear-gradient(135deg, #1f6feb, #58a6ff); }
+        .badge-td { background: linear-gradient(135deg, #238636, #7ee787); color: #000; }
+        .badge-deep { background: linear-gradient(135deg, #8b5cf6, #d2a8ff); color: #000; }
+        .badge-difficulty-intermediate { background: var(--accent-green); color: #000; }
+        .badge-difficulty-advanced { background: var(--accent-orange); color: #000; }
+        .badge-difficulty-expert { background: var(--accent-red); color: #fff; }
+        .badge-difficulty-doctorate { background: linear-gradient(135deg, #ff0080, #7928ca); color: #fff; }
+
+        .btn-glow {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border: none;
+            color: white;
+            font-weight: 600;
+            border-radius: 10px;
+            padding: 0.6rem 1.5rem;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(88,166,255,0.3);
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(88,166,255,0.5);
+            color: white;
+        }
+
+        .code-block {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(135deg, rgba(88,166,255,0.08) 0%, rgba(210,168,255,0.08) 50%, rgba(126,231,135,0.05) 100%);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .form-control, .form-select {
+            background: var(--bg-primary) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--accent-blue) !important;
+            box-shadow: 0 0 0 0.2rem rgba(88,166,255,0.15) !important;
+        }
+        .form-label { color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; }
+
+        .spinner-glow {
+            width: 3rem; height: 3rem;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .table { --bs-table-bg: transparent; --bs-table-color: var(--text-primary); }
+        .table thead th { border-color: var(--border-color); color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+        .table td { border-color: var(--border-color); vertical-align: middle; }
+
+        .pulse-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; margin-right: 6px;
+        }
+        .pulse-dot.running { background: var(--accent-orange); animation: pulse 1.5s infinite; }
+        .pulse-dot.completed { background: var(--accent-green); }
+        .pulse-dot.failed { background: var(--accent-red); }
+        .pulse-dot.pending { background: var(--text-secondary); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'rl_app:home' %}">
+                <i class="bi bi-braces-asterisk me-2"></i>RL Training Lab
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="nav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+                           href="{% url 'rl_app:home' %}"><i class="bi bi-house me-1"></i>Inicio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'results_list' %}active{% endif %}"
+                           href="{% url 'rl_app:results_list' %}"><i class="bi bi-clock-history me-1"></i>Historial</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'compare' %}active{% endif %}"
+                           href="{% url 'rl_app:compare' %}"><i class="bi bi-bar-chart-line me-1"></i>Comparar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'snake_visual' %}active{% endif %}"
+                           href="{% url 'rl_app:snake_visual' %}" style="color: var(--accent-green) !important;">
+                           <i class="bi bi-controller me-1"></i>Snake IA</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'predator_prey' %}active{% endif %}"
+                           href="{% url 'rl_app:predator_prey' %}" style="color: var(--accent-red) !important;">
+                           <i class="bi bi-bullseye me-1"></i>MARL</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="py-4 mt-5">
+        <div class="container text-center">
+            <p class="mb-1"><strong>Aprendizaje por Refuerzo I</strong> - Maestria en Inteligencia Artificial - UBA 2026</p>
+            <p class="small mb-0">Desafio Practico N.1 | Gymnasium + Django + PyTorch</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

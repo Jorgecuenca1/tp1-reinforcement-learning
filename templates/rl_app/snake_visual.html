@@ -1,0 +1,543 @@
+{% extends "rl_app/base.html" %}
+{% block title %}Snake IA - Visualizacion DQN{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left: Game Canvas & Controls -->
+    <div class="col-lg-7">
+        <div class="glass-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="fw-bold mb-0">
+                    <i class="bi bi-controller me-2" style="color: var(--accent-green);"></i>Snake IA
+                </h2>
+                {% if replay_data %}
+                <div class="d-flex gap-2">
+                    <button id="btnPlay" class="btn btn-glow" onclick="startReplay()">
+                        <i class="bi bi-play-fill me-1"></i>Reproducir
+                    </button>
+                    <button id="btnPause" class="btn btn-outline-warning" onclick="pauseReplay()" style="display:none;">
+                        <i class="bi bi-pause-fill me-1"></i>Pausar
+                    </button>
+                    <button id="btnRestart" class="btn btn-outline-info" onclick="restartReplay()" style="display:none;">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reiniciar
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="text-center" style="background: #0a0e14; border-radius: 12px; padding: 20px; border: 2px solid var(--border-color);">
+                <canvas id="snakeCanvas" width="500" height="500" style="border-radius: 8px; max-width: 100%;"></canvas>
+                <div class="mt-3 d-flex justify-content-center gap-4">
+                    <div>
+                        <span class="stat-label">SCORE</span>
+                        <div id="currentScore" class="stat-value" style="color: var(--accent-green); font-size: 1.5rem;">0</div>
+                    </div>
+                    <div>
+                        <span class="stat-label">PASO</span>
+                        <div id="currentStep" class="stat-value" style="color: var(--accent-blue); font-size: 1.5rem;">0</div>
+                    </div>
+                    <div>
+                        <span class="stat-label">VELOCIDAD</span>
+                        <div class="mt-1">
+                            <input type="range" id="speedSlider" min="1" max="20" value="8" class="form-range" style="width: 120px;" oninput="updateSpeed(this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if replay_data %}
+            <!-- Replay Selector -->
+            <div class="mt-3 p-3" style="background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border-color);">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="stat-label">REPRODUCIR:</span>
+                    <button class="btn btn-sm btn-outline-success active" onclick="loadReplay('best')" id="btnBest">
+                        <i class="bi bi-trophy me-1"></i>Mejor (Evaluacion)
+                    </button>
+                    <select class="form-select form-select-sm" style="width: auto; min-width: 220px;" id="replaySelector" onchange="loadSavedReplay(this.value)">
+                        <option value="">-- Episodios de entrenamiento --</option>
+                    </select>
+                    <span id="replayInfo" class="text-secondary small"></span>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not replay_data %}
+            <div class="text-center py-5" id="emptyState">
+                <i class="bi bi-joystick" style="font-size: 4rem; color: var(--accent-green); opacity: 0.3;"></i>
+                <h4 class="text-secondary mt-3">Configura y entrena la IA</h4>
+                <p class="text-secondary">El agente DQN aprendera a jugar Snake.<br>Despues podras ver como juega en tiempo real.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if run_info %}
+        <!-- Results Stats -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Mejor Score</div>
+                    <div class="stat-value" style="color: var(--accent-green); font-size: 1.4rem;">{{ run_info.best_score }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Prom. ult. 100</div>
+                    <div class="stat-value" style="color: var(--accent-blue); font-size: 1.4rem;">{{ run_info.avg_score_last_100 }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Tiempo</div>
+                    <div class="stat-value" style="color: var(--accent-orange); font-size: 1.4rem;">{{ run_info.time }}s</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Score Replay</div>
+                    <div class="stat-value" style="color: var(--accent-purple); font-size: 1.4rem;">{{ run_info.replay_score }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if chart_data %}
+        <!-- Convergence Chart -->
+        <div class="glass-card p-4">
+            <h4 class="fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Convergencia del Entrenamiento</h4>
+            <canvas id="snakeChart" style="max-height: 350px;"></canvas>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: Config Form -->
+    <div class="col-lg-5">
+        <div class="glass-card p-4">
+            <h4 class="fw-bold mb-4"><i class="bi bi-sliders me-2"></i>Configuracion de Entrenamiento</h4>
+            <form method="post" id="snakeForm">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label">Episodios de entrenamiento</label>
+                    <input type="number" class="form-control" name="num_episodes" value="500" min="100" max="10000">
+                    <div class="form-text text-secondary">500-2000 recomendado. Mas episodios = mejor agente pero mas tiempo.</div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Tamano del grid</label>
+                        <select class="form-select" name="grid_size">
+                            <option value="8">8x8 (facil)</option>
+                            <option value="10" selected>10x10 (normal)</option>
+                            <option value="12">12x12 (dificil)</option>
+                            <option value="15">15x15 (experto)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Neuronas ocultas</label>
+                        <select class="form-select" name="hidden_size">
+                            <option value="128">128</option>
+                            <option value="256" selected>256</option>
+                            <option value="512">512</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Epsilon Decay</label>
+                        <input type="number" class="form-control" name="epsilon_decay" value="0.997" step="0.001" min="0.99" max="0.9999">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Learning Rate</label>
+                        <input type="number" class="form-control" name="learning_rate" value="0.001" step="0.0001" min="0.0001" max="0.01">
+                    </div>
+                </div>
+
+                <hr class="border-secondary">
+
+                <button type="submit" class="btn btn-glow btn-lg w-100" id="trainBtn">
+                    <i class="bi bi-lightning me-2"></i>Entrenar Snake IA
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading -->
+        <div id="trainingOverlay" class="glass-card p-4 text-center mt-4" style="display: none;">
+            <div class="spinner-glow mx-auto mb-3"></div>
+            <h5 class="fw-bold mb-2" style="color: var(--accent-green);">Entrenando Snake IA...</h5>
+            <p class="text-secondary mb-0">La red neuronal esta aprendiendo a jugar.</p>
+            <p class="text-secondary small">Esto puede tomar 30s - 5min segun la configuracion.</p>
+        </div>
+
+        <!-- How it works -->
+        <div class="glass-card p-4 mt-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-info-circle me-2"></i>Como funciona</h5>
+            <div class="text-secondary small">
+                <p><strong style="color: var(--accent-blue);">Entorno:</strong> Snake clasico en un grid NxN. La serpiente debe comer comida para crecer sin chocar con paredes o consigo misma.</p>
+                <p><strong style="color: var(--accent-green);">Estado (11 features):</strong> Peligro en 3 direcciones relativas, direccion actual (one-hot), posicion relativa de la comida.</p>
+                <p><strong style="color: var(--accent-orange);">Algoritmo:</strong> DQN con Experience Replay y Target Network. Red: 11 -> 256 -> 256 -> 4 acciones.</p>
+                <p class="mb-0"><strong style="color: var(--accent-purple);">Rewards:</strong> +10 por comer, -10 por morir, -0.01 por paso.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="glass-card p-4 mt-4" style="border-color: var(--accent-red);">
+    <h5 class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error</h5>
+    <pre class="code-block" style="color: var(--accent-red);">{{ error }}</pre>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// === SNAKE CANVAS RENDERING ===
+const canvas = document.getElementById('snakeCanvas');
+const ctx = canvas.getContext('2d');
+
+let replayData = null;
+let currentFrame = 0;
+let animationId = null;
+let playing = false;
+let speed = 8; // frames per second
+
+{% if replay_data %}
+replayData = {{ replay_data|safe }};
+drawFrame(replayData.frames[0]);
+{% else %}
+drawEmptyGrid(10);
+{% endif %}
+
+function drawEmptyGrid(size) {
+    const cellSize = canvas.width / size;
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = 'rgba(48, 54, 61, 0.3)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= size; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(canvas.width, i * cellSize);
+        ctx.stroke();
+    }
+}
+
+function drawFrame(frame) {
+    if (!frame || !replayData) return;
+    const gridSize = replayData.grid_size;
+    const cellSize = canvas.width / gridSize;
+
+    // Background
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(48, 54, 61, 0.25)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= gridSize; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(canvas.width, i * cellSize);
+        ctx.stroke();
+    }
+
+    // Food (glow effect)
+    const fx = frame.food[1] * cellSize;
+    const fy = frame.food[0] * cellSize;
+    const foodCenter = cellSize / 2;
+
+    // Food glow
+    const grd = ctx.createRadialGradient(
+        fx + foodCenter, fy + foodCenter, 2,
+        fx + foodCenter, fy + foodCenter, cellSize
+    );
+    grd.addColorStop(0, 'rgba(255, 55, 55, 0.4)');
+    grd.addColorStop(1, 'rgba(255, 55, 55, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(fx - cellSize/2, fy - cellSize/2, cellSize * 2, cellSize * 2);
+
+    // Food body
+    ctx.fillStyle = '#ff3737';
+    ctx.shadowColor = '#ff3737';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(fx + foodCenter, fy + foodCenter, cellSize * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Snake body
+    const snake = frame.snake;
+    for (let i = snake.length - 1; i >= 0; i--) {
+        const sx = snake[i][1] * cellSize;
+        const sy = snake[i][0] * cellSize;
+        const padding = 1;
+
+        if (i === 0) {
+            // Head
+            ctx.fillStyle = '#7ee787';
+            ctx.shadowColor = '#7ee787';
+            ctx.shadowBlur = 8;
+            roundRect(ctx, sx + padding, sy + padding, cellSize - padding * 2, cellSize - padding * 2, 4);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Eyes
+            const eyeSize = cellSize * 0.12;
+            ctx.fillStyle = '#0a0e14';
+            const dir = frame.direction;
+            let e1x, e1y, e2x, e2y;
+            if (dir === 0) { // up
+                e1x = sx + cellSize * 0.3; e1y = sy + cellSize * 0.3;
+                e2x = sx + cellSize * 0.7; e2y = sy + cellSize * 0.3;
+            } else if (dir === 1) { // right
+                e1x = sx + cellSize * 0.7; e1y = sy + cellSize * 0.3;
+                e2x = sx + cellSize * 0.7; e2y = sy + cellSize * 0.7;
+            } else if (dir === 2) { // down
+                e1x = sx + cellSize * 0.3; e1y = sy + cellSize * 0.7;
+                e2x = sx + cellSize * 0.7; e2y = sy + cellSize * 0.7;
+            } else { // left
+                e1x = sx + cellSize * 0.3; e1y = sy + cellSize * 0.3;
+                e2x = sx + cellSize * 0.3; e2y = sy + cellSize * 0.7;
+            }
+            ctx.beginPath(); ctx.arc(e1x, e1y, eyeSize, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(e2x, e2y, eyeSize, 0, Math.PI * 2); ctx.fill();
+        } else {
+            // Body gradient (darker towards tail)
+            const ratio = 1 - (i / snake.length) * 0.6;
+            const g = Math.round(231 * ratio);
+            const r = Math.round(126 * ratio);
+            ctx.fillStyle = `rgb(${r}, ${g}, ${Math.round(135 * ratio)})`;
+            roundRect(ctx, sx + padding + 1, sy + padding + 1, cellSize - padding * 2 - 2, cellSize - padding * 2 - 2, 3);
+            ctx.fill();
+        }
+    }
+
+    // Score display on canvas
+    ctx.fillStyle = 'rgba(240, 246, 252, 0.8)';
+    ctx.font = 'bold 14px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${frame.score}`, 8, 18);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function startReplay() {
+    if (!replayData) return;
+    if (!playing) {
+        playing = true;
+        document.getElementById('btnPlay').style.display = 'none';
+        document.getElementById('btnPause').style.display = '';
+        document.getElementById('btnRestart').style.display = '';
+        animate();
+    }
+}
+
+function pauseReplay() {
+    playing = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    document.getElementById('btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Continuar';
+    document.getElementById('btnPlay').style.display = '';
+    document.getElementById('btnPause').style.display = 'none';
+}
+
+function restartReplay() {
+    currentFrame = 0;
+    playing = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    document.getElementById('btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Reproducir';
+    document.getElementById('btnPlay').style.display = '';
+    document.getElementById('btnPause').style.display = 'none';
+    if (replayData) drawFrame(replayData.frames[0]);
+    document.getElementById('currentScore').textContent = '0';
+    document.getElementById('currentStep').textContent = '0';
+}
+
+let lastFrameTime = 0;
+function animate(timestamp) {
+    if (!playing) return;
+
+    if (!timestamp) timestamp = 0;
+    const interval = 1000 / speed;
+
+    if (timestamp - lastFrameTime >= interval) {
+        lastFrameTime = timestamp;
+
+        if (currentFrame < replayData.frames.length) {
+            const frame = replayData.frames[currentFrame];
+            drawFrame(frame);
+            document.getElementById('currentScore').textContent = frame.score;
+            document.getElementById('currentStep').textContent = currentFrame;
+            currentFrame++;
+        } else {
+            // Fin del replay
+            playing = false;
+            document.getElementById('btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Reproducir';
+            document.getElementById('btnPlay').style.display = '';
+            document.getElementById('btnPause').style.display = 'none';
+
+            // Flash final score
+            const scoreEl = document.getElementById('currentScore');
+            scoreEl.style.color = '#ffd700';
+            setTimeout(() => { scoreEl.style.color = 'var(--accent-green)'; }, 1500);
+            return;
+        }
+    }
+    animationId = requestAnimationFrame(animate);
+}
+
+function updateSpeed(val) {
+    speed = parseInt(val);
+}
+
+// === SAVED REPLAYS SELECTOR ===
+const allReplays = {{ all_replays_data|safe }};
+const originalReplay = replayData ? JSON.parse(JSON.stringify(replayData)) : null;
+
+// Poblar el selector
+const selector = document.getElementById('replaySelector');
+if (selector && allReplays.length > 0) {
+    allReplays.forEach((r, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `Ep. ${r.episode} | Score: ${r.score} | Reward: ${r.reward}`;
+        selector.appendChild(opt);
+    });
+}
+
+function loadReplay(type) {
+    restartReplay();
+    if (type === 'best' && originalReplay) {
+        replayData = originalReplay;
+        drawFrame(replayData.frames[0]);
+        updateReplayInfo('Mejor (evaluacion)', replayData.score || '-');
+    }
+    if (selector) selector.value = '';
+    document.getElementById('btnBest')?.classList.add('active');
+}
+
+function loadSavedReplay(idx) {
+    if (idx === '' || !allReplays[idx]) return;
+    restartReplay();
+    const r = allReplays[idx];
+    replayData = { frames: r.frames, grid_size: originalReplay?.grid_size || 10, score: r.score };
+    drawFrame(replayData.frames[0]);
+    updateReplayInfo(`Episodio ${r.episode}`, r.score);
+    document.getElementById('btnBest')?.classList.remove('active');
+}
+
+function updateReplayInfo(label, score) {
+    const el = document.getElementById('replayInfo');
+    if (el) el.innerHTML = `<i class="bi bi-film me-1"></i><strong>${label}</strong> | Score: ${score} | ${replayData.frames.length} frames`;
+}
+
+{% if replay_data %}
+updateReplayInfo('Mejor (evaluacion)', replayData.score || '-');
+{% endif %}
+
+// Training form submit loading
+const form = document.getElementById('snakeForm');
+if (form) {
+    form.addEventListener('submit', function() {
+        document.getElementById('trainBtn').disabled = true;
+        document.getElementById('trainBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Entrenando...';
+        document.getElementById('trainingOverlay').style.display = 'block';
+    });
+}
+
+// === CONVERGENCE CHART ===
+{% if chart_data %}
+const chartData = {{ chart_data|safe }};
+if (chartData) {
+    const datasets = [
+        {
+            label: 'Reward por episodio',
+            data: chartData.rewards,
+            borderColor: 'rgba(88, 166, 255, 0.12)',
+            borderWidth: 1,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.1,
+        },
+        {
+            label: 'Media movil (Reward)',
+            data: Array(chartData.ma_start - 1).fill(null).concat(chartData.moving_avg),
+            borderColor: '#f78166',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.3,
+        },
+    ];
+
+    if (chartData.scores_ma && chartData.scores_ma.length > 0) {
+        datasets.push({
+            label: 'Media movil (Score)',
+            data: Array(chartData.ma_start - 1).fill(null).concat(chartData.scores_ma),
+            borderColor: '#7ee787',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.3,
+            yAxisID: 'y1',
+        });
+    }
+
+    new Chart(document.getElementById('snakeChart'), {
+        type: 'line',
+        data: { labels: chartData.labels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { labels: { color: '#8b949e', font: { family: 'Inter' } } },
+                tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1, titleColor: '#f0f6fc', bodyColor: '#8b949e' }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Episodio', color: '#8b949e' },
+                    ticks: { color: '#8b949e', maxTicksLimit: 12 },
+                    grid: { color: 'rgba(139,148,158,0.1)' }
+                },
+                y: {
+                    title: { display: true, text: 'Reward', color: '#8b949e' },
+                    ticks: { color: '#8b949e' },
+                    grid: { color: 'rgba(139,148,158,0.1)' },
+                    position: 'left',
+                },
+                y1: {
+                    title: { display: true, text: 'Score (comidas)', color: '#7ee787' },
+                    ticks: { color: '#7ee787' },
+                    grid: { display: false },
+                    position: 'right',
+                }
+            }
+        }
+    });
+}
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends "rl_app/base.html" %}
+{% block title %}Comparar Ejecuciones{% endblock %}
+
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-bar-chart-line me-2"></i>Comparar Ejecuciones</h2>
+
+<!-- Selection Form -->
+<div class="glass-card p-4 mb-4">
+    <h5 class="fw-bold mb-3">Seleccionar ejecuciones para comparar</h5>
+    <form method="get" id="compareForm">
+        <div class="row g-2 align-items-end">
+            {% for run in all_runs %}
+            <div class="col-md-6 col-lg-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="runs" value="{{ run.pk }}"
+                           id="run_{{ run.pk }}" {% if run.pk in selected_ids %}checked{% endif %}>
+                    <label class="form-check-label small" for="run_{{ run.pk }}">
+                        <span class="fw-semibold">#{{ run.pk }}</span>
+                        {{ run.technique.name }} - {{ run.problem.name }}
+                        <span class="text-secondary">({{ run.avg_reward_last_100|floatformat:1 }})</span>
+                    </label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="mt-3">
+            <button type="submit" class="btn btn-glow"><i class="bi bi-bar-chart me-1"></i>Comparar</button>
+        </div>
+    </form>
+</div>
+
+{% if runs %}
+<!-- Comparison Chart -->
+<div class="glass-card p-4 mb-4">
+    <h4 class="fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Curvas de Convergencia</h4>
+    <canvas id="compareChart" style="max-height: 450px;"></canvas>
+</div>
+
+<!-- Comparison Table -->
+<div class="glass-card p-4">
+    <h4 class="fw-bold mb-3"><i class="bi bi-table me-2"></i>Tabla Comparativa</h4>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th class="ps-3">Metrica</th>
+                    {% for run in runs %}
+                    <th class="text-center">
+                        <span class="d-block small text-info">{{ run.technique.name }}</span>
+                        <span class="d-block small text-secondary">{{ run.problem.name }}</span>
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="ps-3 text-secondary">Mejor Reward</td>
+                    {% for run in runs %}
+                    <td class="text-center font-monospace">{{ run.best_reward|floatformat:1 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="ps-3 text-secondary">Promedio (ult. 100)</td>
+                    {% for run in runs %}
+                    <td class="text-center font-monospace">{{ run.avg_reward_last_100|floatformat:1 }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="ps-3 text-secondary">Episodios</td>
+                    {% for run in runs %}
+                    <td class="text-center font-monospace">{{ run.num_episodes }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="ps-3 text-secondary">Tiempo</td>
+                    {% for run in runs %}
+                    <td class="text-center font-monospace">{{ run.duration_display }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="ps-3 text-secondary">Gamma</td>
+                    {% for run in runs %}
+                    <td class="text-center font-monospace">{{ run.gamma }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="ps-3 text-secondary">Epsilon Decay</td>
+                    {% for run in runs %}
+                    <td class="text-center font-monospace">{{ run.epsilon_decay }}</td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if runs %}
+<script>
+const datasets = {{ chart_datasets|safe }};
+if (datasets.length > 0) {
+    const chartDatasets = datasets.map(ds => ({
+        label: ds.label,
+        data: ds.data,
+        borderColor: ds.color,
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+    }));
+
+    new Chart(document.getElementById('compareChart'), {
+        type: 'line',
+        data: { labels: Array.from({length: Math.max(...datasets.map(d => d.data.length))}, (_, i) => i + 1), datasets: chartDatasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { labels: { color: '#8b949e', font: { family: 'Inter' } } },
+                tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1, titleColor: '#f0f6fc', bodyColor: '#8b949e' }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Episodio', color: '#8b949e' }, ticks: { color: '#8b949e', maxTicksLimit: 15 }, grid: { color: 'rgba(139,148,158,0.1)' } },
+                y: { title: { display: true, text: 'Recompensa (Media Movil)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: 'rgba(139,148,158,0.1)' } }
+            }
+        }
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

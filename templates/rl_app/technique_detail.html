@@ -1,0 +1,126 @@
+{% extends "rl_app/base.html" %}
+{% block title %}{{ technique.name }}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'rl_app:home' %}" class="text-info text-decoration-none">Inicio</a></li>
+        <li class="breadcrumb-item active text-secondary">{{ technique.name }}</li>
+    </ol>
+</nav>
+
+<!-- Technique Header -->
+<div class="hero-gradient p-4 p-md-5 mb-5">
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="d-flex align-items-center mb-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                     style="width:56px; height:56px;
+                     {% if technique.category == 'monte_carlo' %}background: linear-gradient(135deg, #1f6feb, #58a6ff);
+                     {% elif technique.category == 'td' %}background: linear-gradient(135deg, #238636, #7ee787);
+                     {% else %}background: linear-gradient(135deg, #8b5cf6, #d2a8ff);{% endif %}">
+                    <i class="bi bi-{{ technique.icon }} fs-4 {% if technique.category == 'td' or technique.category == 'deep' %}text-dark{% else %}text-white{% endif %}"></i>
+                </div>
+                <div>
+                    <h1 class="fw-bold mb-0">{{ technique.name }}</h1>
+                    <span class="badge {% if technique.category == 'monte_carlo' %}badge-mc{% elif technique.category == 'td' %}badge-td{% else %}badge-deep{% endif %} mt-1">
+                        {{ technique.get_category_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="text-secondary" style="white-space: pre-line; line-height: 1.7;">{{ technique.description }}</div>
+        </div>
+        <div class="col-lg-5 mt-4 mt-lg-0">
+            {% if technique.pseudocode %}
+            <h6 class="text-info fw-bold mb-2"><i class="bi bi-code-slash me-1"></i>Pseudocodigo</h6>
+            <div class="code-block" style="font-size: 0.78rem; max-height: 350px; overflow-y: auto;">{{ technique.pseudocode }}</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Problems Grid -->
+<h2 class="fw-bold mb-4"><i class="bi bi-puzzle me-2"></i>Problemas Disponibles</h2>
+<div class="row g-4 mb-5">
+    {% for problem in problems %}
+    <div class="col-md-6">
+        <div class="glass-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h4 class="fw-bold mb-1">{{ problem.name }}</h4>
+                    <code class="small" style="color: var(--accent-blue);">{{ problem.env_id }}</code>
+                </div>
+                <span class="badge badge-difficulty-{{ problem.difficulty }} px-3 py-2">
+                    {{ problem.get_difficulty_display }}
+                </span>
+            </div>
+
+            <p class="text-secondary small mb-3">{{ problem.description }}</p>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="stat-card py-2 px-3">
+                        <div class="stat-label" style="font-size: 0.7rem;">Espacio de Estados</div>
+                        <div class="small text-light">{{ problem.state_space_info|truncatewords:8 }}</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="stat-card py-2 px-3">
+                        <div class="stat-label" style="font-size: 0.7rem;">Espacio de Acciones</div>
+                        <div class="small text-light">{{ problem.action_space_info|truncatewords:8 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="small text-secondary">
+                    {% if problem.requires_discretization %}
+                    <span class="badge bg-warning text-dark me-1"><i class="bi bi-grid-3x3 me-1"></i>Discretizado</span>
+                    {% endif %}
+                    <span class="text-muted">{{ problem.default_episodes|floatformat:0 }} episodios default</span>
+                </div>
+                <a href="{% url 'rl_app:run_training' technique.slug problem.slug %}" class="btn btn-glow btn-sm">
+                    <i class="bi bi-play-fill me-1"></i>Entrenar
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Recent Runs for this Technique -->
+{% if recent_runs %}
+<h3 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Ejecuciones Recientes</h3>
+<div class="glass-card p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Problema</th>
+                    <th>Mejor Reward</th>
+                    <th>Promedio</th>
+                    <th>Episodios</th>
+                    <th>Tiempo</th>
+                    <th class="pe-4"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in recent_runs %}
+                <tr>
+                    <td class="ps-4">{{ run.problem.name }}</td>
+                    <td class="font-monospace">{{ run.best_reward|floatformat:1 }}</td>
+                    <td class="font-monospace">{{ run.avg_reward_last_100|floatformat:1 }}</td>
+                    <td class="font-monospace">{{ run.num_episodes }}</td>
+                    <td class="font-monospace">{{ run.duration_display }}</td>
+                    <td class="pe-4">
+                        <a href="{% url 'rl_app:results' run.pk %}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

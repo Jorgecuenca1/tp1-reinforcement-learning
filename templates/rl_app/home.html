@@ -1,0 +1,128 @@
+{% extends "rl_app/base.html" %}
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero-gradient p-4 p-md-5 mb-5">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h1 class="display-5 fw-bold mb-3">
+                <span style="background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                    Reinforcement Learning
+                </span>
+                <br>Training Lab
+            </h1>
+            <p class="lead text-secondary mb-4">
+                Plataforma interactiva para entrenar y comparar algoritmos de Aprendizaje por Refuerzo.
+                Selecciona una tecnica, configura hiperparametros, ejecuta el entrenamiento y exporta a Google Colab.
+            </p>
+            <div class="d-flex gap-3 flex-wrap">
+                <span class="badge badge-mc px-3 py-2 fs-6">Monte Carlo</span>
+                <span class="badge badge-td px-3 py-2 fs-6">Temporal Difference</span>
+                <span class="badge badge-deep px-3 py-2 fs-6">Deep RL</span>
+            </div>
+        </div>
+        <div class="col-lg-4 text-center mt-4 mt-lg-0">
+            <div class="row g-3">
+                <div class="col-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-value text-info">{{ stats.techniques_count }}</div>
+                        <div class="stat-label">Tecnicas</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-value" style="color: var(--accent-green);">{{ stats.problems_count }}</div>
+                        <div class="stat-label">Problemas</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-value" style="color: var(--accent-orange);">{{ stats.total_runs }}</div>
+                        <div class="stat-label">Ejecuciones</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Techniques Grid -->
+<h2 class="fw-bold mb-4"><i class="bi bi-grid-3x3-gap me-2"></i>Tecnicas de RL</h2>
+<div class="row g-4 mb-5">
+    {% for technique in techniques %}
+    <div class="col-md-6 col-lg-4">
+        <a href="{% url 'rl_app:technique_detail' technique.slug %}" class="text-decoration-none">
+            <div class="glass-card p-4 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                         style="width:48px; height:48px;
+                         {% if technique.category == 'monte_carlo' %}background: linear-gradient(135deg, #1f6feb, #58a6ff);
+                         {% elif technique.category == 'td' %}background: linear-gradient(135deg, #238636, #7ee787);
+                         {% else %}background: linear-gradient(135deg, #8b5cf6, #d2a8ff);{% endif %}">
+                        <i class="bi bi-{{ technique.icon }} fs-5 {% if technique.category == 'td' or technique.category == 'deep' %}text-dark{% else %}text-white{% endif %}"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 text-light">{{ technique.name }}</h5>
+                        <span class="badge {% if technique.category == 'monte_carlo' %}badge-mc{% elif technique.category == 'td' %}badge-td{% else %}badge-deep{% endif %} mt-1">
+                            {{ technique.get_category_display }}
+                        </span>
+                    </div>
+                </div>
+                <p class="text-secondary small mb-3">{{ technique.description|truncatewords:30 }}</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">
+                        <i class="bi bi-puzzle me-1"></i>{{ technique.problems.count }} problema{{ technique.problems.count|pluralize:"s" }}
+                    </span>
+                    <span class="text-info small fw-semibold">Explorar <i class="bi bi-arrow-right"></i></span>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Recent Runs -->
+{% if recent_runs %}
+<h2 class="fw-bold mb-4"><i class="bi bi-clock-history me-2"></i>Ejecuciones Recientes</h2>
+<div class="glass-card p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">Estado</th>
+                    <th>Tecnica</th>
+                    <th>Problema</th>
+                    <th>Mejor Reward</th>
+                    <th>Promedio (ult. 100)</th>
+                    <th>Tiempo</th>
+                    <th class="pe-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in recent_runs %}
+                <tr>
+                    <td class="ps-4">
+                        <span class="pulse-dot {{ run.status }}"></span>
+                        <span class="small">{{ run.get_status_display }}</span>
+                    </td>
+                    <td>{{ run.technique.name }}</td>
+                    <td>{{ run.problem.name }}</td>
+                    <td class="font-monospace">{% if run.best_reward is not None %}{{ run.best_reward|floatformat:1 }}{% else %}-{% endif %}</td>
+                    <td class="font-monospace">{% if run.avg_reward_last_100 is not None %}{{ run.avg_reward_last_100|floatformat:1 }}{% else %}-{% endif %}</td>
+                    <td class="font-monospace">{{ run.duration_display }}</td>
+                    <td class="pe-4">
+                        {% if run.status == 'completed' or run.status == 'failed' %}
+                        <a href="{% url 'rl_app:results' run.pk %}" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-eye"></i> Ver
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

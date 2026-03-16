@@ -1,0 +1,99 @@
+{% extends "rl_app/base.html" %}
+{% block title %}Historial de Ejecuciones{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="bi bi-clock-history me-2"></i>Historial de Ejecuciones</h2>
+</div>
+
+<!-- Filters -->
+<div class="glass-card p-3 mb-4">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Tecnica</label>
+            <select name="technique" class="form-select">
+                <option value="">Todas</option>
+                {% for tech in techniques %}
+                <option value="{{ tech.slug }}" {% if current_technique == tech.slug %}selected{% endif %}>{{ tech.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Estado</label>
+            <select name="status" class="form-select">
+                <option value="">Todos</option>
+                <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completado</option>
+                <option value="failed" {% if current_status == 'failed' %}selected{% endif %}>Fallido</option>
+                <option value="running" {% if current_status == 'running' %}selected{% endif %}>Ejecutando</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-outline-info w-100"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'rl_app:results_list' %}" class="btn btn-outline-secondary w-100"><i class="bi bi-x-circle me-1"></i>Limpiar</a>
+        </div>
+    </form>
+</div>
+
+<!-- Results Table -->
+{% if runs %}
+<div class="glass-card p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-4">#</th>
+                    <th>Estado</th>
+                    <th>Tecnica</th>
+                    <th>Problema</th>
+                    <th>Episodios</th>
+                    <th>Mejor Reward</th>
+                    <th>Promedio</th>
+                    <th>Tiempo</th>
+                    <th>Fecha</th>
+                    <th class="pe-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in runs %}
+                <tr>
+                    <td class="ps-4 font-monospace text-secondary">{{ run.pk }}</td>
+                    <td>
+                        <span class="pulse-dot {{ run.status }}"></span>
+                        <span class="small">{{ run.get_status_display }}</span>
+                    </td>
+                    <td>
+                        <a href="{% url 'rl_app:technique_detail' run.technique.slug %}" class="text-info text-decoration-none">
+                            {{ run.technique.name }}
+                        </a>
+                    </td>
+                    <td>{{ run.problem.name }}</td>
+                    <td class="font-monospace">{{ run.num_episodes }}</td>
+                    <td class="font-monospace">{% if run.best_reward is not None %}{{ run.best_reward|floatformat:1 }}{% else %}-{% endif %}</td>
+                    <td class="font-monospace">{% if run.avg_reward_last_100 is not None %}{{ run.avg_reward_last_100|floatformat:1 }}{% else %}-{% endif %}</td>
+                    <td class="font-monospace">{{ run.duration_display }}</td>
+                    <td class="small text-secondary">{{ run.created_at|date:"d/m H:i" }}</td>
+                    <td class="pe-4">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'rl_app:results' run.pk %}" class="btn btn-outline-info" title="Ver"><i class="bi bi-eye"></i></a>
+                            {% if run.status == 'completed' %}
+                            <a href="{% url 'rl_app:export_colab' run.pk %}" class="btn btn-outline-success" title="Exportar"><i class="bi bi-download"></i></a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="glass-card p-5 text-center">
+    <i class="bi bi-inbox fs-1 text-secondary mb-3 d-block"></i>
+    <h5 class="text-secondary">No hay ejecuciones registradas</h5>
+    <p class="text-secondary">Selecciona una tecnica y un problema para comenzar a entrenar.</p>
+    <a href="{% url 'rl_app:home' %}" class="btn btn-glow mt-2"><i class="bi bi-play me-1"></i>Ir al inicio</a>
+</div>
+{% endif %}
+{% endblock %}

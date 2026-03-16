@@ -1,0 +1,557 @@
+{% extends "rl_app/base.html" %}
+{% block title %}MARL Predator-Prey{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left: Game Canvas -->
+    <div class="col-lg-7">
+        <div class="glass-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="fw-bold mb-0">
+                        <i class="bi bi-bullseye me-2" style="color: var(--accent-red);"></i>Predator-Prey
+                    </h2>
+                    <span class="badge badge-deep mt-1">Multi-Agent RL - Nivel Doctorado</span>
+                </div>
+                {% if replay_data %}
+                <div class="d-flex gap-2">
+                    <button id="btnPlay" class="btn btn-glow" onclick="startReplay()">
+                        <i class="bi bi-play-fill me-1"></i>Reproducir
+                    </button>
+                    <button id="btnPause" class="btn btn-outline-warning" onclick="pauseReplay()" style="display:none;">
+                        <i class="bi bi-pause-fill me-1"></i>Pausar
+                    </button>
+                    <button id="btnRestart" class="btn btn-outline-info" onclick="restartReplay()" style="display:none;">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="text-center" style="background: #0a0e14; border-radius: 12px; padding: 20px; border: 2px solid var(--border-color);">
+                <canvas id="ppCanvas" width="540" height="540" style="border-radius: 8px; max-width: 100%;"></canvas>
+                <div class="mt-3 d-flex justify-content-center gap-4">
+                    <div>
+                        <span class="stat-label">PASO</span>
+                        <div id="currentStep" class="stat-value" style="color: var(--accent-blue); font-size: 1.3rem;">0</div>
+                    </div>
+                    <div>
+                        <span class="stat-label">CAPTURAS</span>
+                        <div id="currentCaptures" class="stat-value" style="color: var(--accent-green); font-size: 1.3rem;">0</div>
+                    </div>
+                    <div>
+                        <span class="stat-label">ESTADO</span>
+                        <div id="gameStatus" class="stat-value" style="color: var(--accent-orange); font-size: 1.3rem;">--</div>
+                    </div>
+                    <div>
+                        <span class="stat-label">VELOCIDAD</span>
+                        <div class="mt-1">
+                            <input type="range" id="speedSlider" min="1" max="20" value="6" class="form-range" style="width: 100px;" oninput="updateSpeed(this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if replay_data %}
+            <div class="mt-3 p-3" style="background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border-color);">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="stat-label">REPRODUCIR:</span>
+                    <button class="btn btn-sm btn-outline-success active" onclick="loadReplay('best')" id="btnBest">
+                        <i class="bi bi-trophy me-1"></i>Mejor (Evaluacion)
+                    </button>
+                    <select class="form-select form-select-sm" style="width: auto; min-width: 250px;" id="replaySelector" onchange="loadSavedReplay(this.value)">
+                        <option value="">-- Episodios de entrenamiento --</option>
+                    </select>
+                    <span id="replayInfo" class="text-secondary small"></span>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not replay_data %}
+            <div class="text-center py-5">
+                <i class="bi bi-bullseye" style="font-size: 4rem; color: var(--accent-red); opacity: 0.3;"></i>
+                <h4 class="text-secondary mt-3">Entrena los depredadores</h4>
+                <p class="text-secondary">3 depredadores (rojo) deben aprender a cooperar<br>para atrapar la presa (azul) que huye inteligentemente.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if run_info %}
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Tasa Captura</div>
+                    <div class="stat-value" style="color: var(--accent-green); font-size: 1.3rem;">{{ run_info.capture_rate_last_100 }}%</div>
+                    <div class="text-secondary" style="font-size: 0.7rem;">ultimos 100 ep.</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Eval. Captura</div>
+                    <div class="stat-value" style="color: var(--accent-blue); font-size: 1.3rem;">{{ run_info.eval_capture_rate }}%</div>
+                    <div class="text-secondary" style="font-size: 0.7rem;">greedy (5 ep.)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Mejor Captura</div>
+                    <div class="stat-value" style="color: var(--accent-orange); font-size: 1.3rem;">{{ run_info.best_capture_time }} pasos</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-label mb-1">Cooperacion</div>
+                    <div class="stat-value" style="color: var(--accent-purple); font-size: 1.3rem;">{{ run_info.total_cooperation }}</div>
+                    <div class="text-secondary" style="font-size: 0.7rem;">eventos totales</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if chart_data %}
+        <div class="glass-card p-4 mb-4">
+            <h4 class="fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Convergencia MARL</h4>
+            <canvas id="rewardChart" style="max-height: 300px;"></canvas>
+        </div>
+        <div class="glass-card p-4">
+            <h4 class="fw-bold mb-3"><i class="bi bi-trophy me-2"></i>Tasa de Captura (%)</h4>
+            <canvas id="captureChart" style="max-height: 250px;"></canvas>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: Config -->
+    <div class="col-lg-5">
+        <div class="glass-card p-4">
+            <h4 class="fw-bold mb-4"><i class="bi bi-sliders me-2"></i>Configuracion MARL</h4>
+            <form method="post" id="ppForm">
+                {% csrf_token %}
+
+                <h6 class="text-info mb-2 fw-bold">Entorno</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Grid</label>
+                        <select class="form-select" name="grid_size">
+                            <option value="8">8x8</option>
+                            <option value="10">10x10</option>
+                            <option value="12" selected>12x12</option>
+                            <option value="15">15x15</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Vision</label>
+                        <input type="number" class="form-control" name="vision_range" value="4" min="2" max="10">
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-4">
+                        <label class="form-label">Depredadores</label>
+                        <input type="number" class="form-control" name="n_predators" value="3" min="2" max="6">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Presas</label>
+                        <input type="number" class="form-control" name="n_prey" value="1" min="1" max="3">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Max pasos</label>
+                        <input type="number" class="form-control" name="max_steps" value="200" min="50" max="500">
+                    </div>
+                </div>
+
+                <h6 class="text-info mb-2 fw-bold mt-3">Entrenamiento</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Episodios</label>
+                        <input type="number" class="form-control" name="num_episodes" value="500" min="100" max="5000">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Neuronas</label>
+                        <select class="form-select" name="hidden_size">
+                            <option value="128">128</option>
+                            <option value="256" selected>256</option>
+                            <option value="512">512</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Epsilon Decay</label>
+                        <input type="number" class="form-control" name="epsilon_decay" value="0.998" step="0.001" min="0.99" max="0.9999">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Learning Rate</label>
+                        <input type="number" class="form-control" name="learning_rate" value="0.0005" step="0.0001" min="0.0001" max="0.01">
+                    </div>
+                </div>
+
+                <hr class="border-secondary">
+                <button type="submit" class="btn btn-glow btn-lg w-100" id="trainBtn">
+                    <i class="bi bi-lightning me-2"></i>Entrenar Depredadores
+                </button>
+            </form>
+        </div>
+
+        <div id="trainingOverlay" class="glass-card p-4 text-center mt-4" style="display: none;">
+            <div class="spinner-glow mx-auto mb-3"></div>
+            <h5 class="fw-bold mb-2" style="color: var(--accent-red);">Entrenando MARL...</h5>
+            <p class="text-secondary mb-0">Los depredadores estan aprendiendo a cooperar.</p>
+        </div>
+
+        <!-- Research Context -->
+        <div class="glass-card p-4 mt-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-mortarboard me-2" style="color: var(--accent-purple);"></i>Contexto Academico</h5>
+            <div class="text-secondary small">
+                <p><strong style="color: var(--accent-red);">Problema:</strong> Multi-Agent Reinforcement Learning (MARL) con agentes cooperativos. Los depredadores deben aprender coordinacion emergente sin comunicacion explicita.</p>
+                <p><strong style="color: var(--accent-blue);">Tecnica:</strong> Independent Q-Learning (IQL) con Parameter Sharing. Cada depredador comparte la misma red neuronal pero recibe observaciones locales distintas (Partial Observability).</p>
+                <p><strong style="color: var(--accent-green);">Captura Cooperativa:</strong> Se requieren 2+ depredadores adyacentes a la presa simultaneamente. Esto fuerza coordinacion.</p>
+                <p class="mb-1"><strong style="color: var(--accent-purple);">Referencias:</strong></p>
+                <ul class="mb-0" style="font-size: 0.75rem;">
+                    <li>Tan (1993) - Multi-Agent RL: Independent vs. Cooperative</li>
+                    <li>Lowe et al. (2017) - MADDPG, OpenAI</li>
+                    <li>Rashid et al. (2018) - QMIX</li>
+                    <li>Foerster et al. (2018) - Counterfactual Multi-Agent Policy Gradients</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="glass-card p-4 mt-4">
+            <h6 class="fw-bold mb-2"><i class="bi bi-palette me-2"></i>Leyenda</h6>
+            <div class="d-flex flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#ff4444,#ff7b72);"></div>
+                    <span class="small text-secondary">Depredadores</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#2196F3,#58a6ff);"></div>
+                    <span class="small text-secondary">Presa</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:16px;height:16px;border-radius:4px;background:rgba(255,68,68,0.15);border:1px dashed rgba(255,68,68,0.4);"></div>
+                    <span class="small text-secondary">Rango de vision</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="glass-card p-4 mt-4" style="border-color: var(--accent-red);">
+    <h5 class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error</h5>
+    <pre class="code-block" style="color: var(--accent-red);">{{ error }}</pre>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('ppCanvas');
+const ctx = canvas.getContext('2d');
+let replayData = null;
+let currentFrame = 0;
+let animationId = null;
+let playing = false;
+let speed = 6;
+const VISION_RANGE = parseInt('{{ run_info.grid_size|default:"12" }}') > 0 ? 4 : 4;
+
+const predatorColors = ['#ff4444', '#ff6b35', '#ff9500', '#ff3366', '#e91e63', '#f44336'];
+const predatorGlow = ['rgba(255,68,68,0.3)', 'rgba(255,107,53,0.3)', 'rgba(255,149,0,0.3)', 'rgba(255,51,102,0.3)', 'rgba(233,30,99,0.3)', 'rgba(244,67,54,0.3)'];
+
+{% if replay_data %}
+replayData = {{ replay_data|safe }};
+drawPPFrame(replayData.frames[0]);
+{% else %}
+drawEmptyPPGrid(12);
+{% endif %}
+
+function drawEmptyPPGrid(size) {
+    const cellSize = canvas.width / size;
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(48, 54, 61, 0.3)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= size; i++) {
+        ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize); ctx.stroke();
+    }
+}
+
+function drawPPFrame(frame) {
+    if (!frame || !replayData) return;
+    const gs = replayData.grid_size;
+    const cs = canvas.width / gs;
+
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(48, 54, 61, 0.2)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= gs; i++) {
+        ctx.beginPath(); ctx.moveTo(i * cs, 0); ctx.lineTo(i * cs, canvas.height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i * cs); ctx.lineTo(canvas.width, i * cs); ctx.stroke();
+    }
+
+    // Vision range for each predator
+    frame.predators.forEach((p, idx) => {
+        const px = p[1] * cs + cs/2;
+        const py = p[0] * cs + cs/2;
+        const vr = VISION_RANGE;
+
+        ctx.fillStyle = predatorGlow[idx % predatorGlow.length].replace('0.3', '0.06');
+        ctx.strokeStyle = predatorGlow[idx % predatorGlow.length].replace('0.3', '0.15');
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        const vrPx = vr * cs;
+        ctx.beginPath();
+        ctx.rect(px - vrPx, py - vrPx, vrPx * 2, vrPx * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+    });
+
+    // Prey
+    frame.prey.forEach((p, idx) => {
+        if (!frame.prey_alive[idx]) return;
+        const px = p[1] * cs + cs/2;
+        const py = p[0] * cs + cs/2;
+
+        // Glow
+        const grd = ctx.createRadialGradient(px, py, 2, px, py, cs * 1.2);
+        grd.addColorStop(0, 'rgba(33, 150, 243, 0.4)');
+        grd.addColorStop(1, 'rgba(33, 150, 243, 0)');
+        ctx.fillStyle = grd;
+        ctx.fillRect(px - cs * 1.2, py - cs * 1.2, cs * 2.4, cs * 2.4);
+
+        // Body
+        ctx.fillStyle = '#2196F3';
+        ctx.shadowColor = '#2196F3';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(px, py, cs * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Inner highlight
+        ctx.fillStyle = '#64b5f6';
+        ctx.beginPath();
+        ctx.arc(px - cs*0.08, py - cs*0.08, cs * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(10, cs*0.35)}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('P', px, py);
+    });
+
+    // Predators
+    frame.predators.forEach((p, idx) => {
+        const px = p[1] * cs + cs/2;
+        const py = p[0] * cs + cs/2;
+        const color = predatorColors[idx % predatorColors.length];
+
+        // Glow
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px, py, cs * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Inner
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(px - cs*0.06, py - cs*0.08, cs * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${Math.max(9, cs*0.3)}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`D${idx+1}`, px, py);
+    });
+
+    // Capture flash
+    if (frame.captures > 0 && frame.prey_alive.some(a => !a)) {
+        ctx.fillStyle = 'rgba(126, 231, 135, 0.15)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // HUD
+    ctx.fillStyle = 'rgba(240,246,252,0.7)';
+    ctx.font = 'bold 13px Inter';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`Paso: ${frame.step} | Capturas: ${frame.captures}`, 8, 8);
+}
+
+function startReplay() {
+    if (!replayData) return;
+    if (!playing) {
+        playing = true;
+        document.getElementById('btnPlay').style.display = 'none';
+        document.getElementById('btnPause').style.display = '';
+        document.getElementById('btnRestart').style.display = '';
+        animate();
+    }
+}
+function pauseReplay() {
+    playing = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    document.getElementById('btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Continuar';
+    document.getElementById('btnPlay').style.display = '';
+    document.getElementById('btnPause').style.display = 'none';
+}
+function restartReplay() {
+    currentFrame = 0;
+    playing = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    document.getElementById('btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Reproducir';
+    document.getElementById('btnPlay').style.display = '';
+    document.getElementById('btnPause').style.display = 'none';
+    if (replayData) drawPPFrame(replayData.frames[0]);
+    document.getElementById('currentStep').textContent = '0';
+    document.getElementById('currentCaptures').textContent = '0';
+    document.getElementById('gameStatus').textContent = '--';
+}
+let lastFrameTime = 0;
+function animate(timestamp) {
+    if (!playing) return;
+    if (!timestamp) timestamp = 0;
+    const interval = 1000 / speed;
+    if (timestamp - lastFrameTime >= interval) {
+        lastFrameTime = timestamp;
+        if (currentFrame < replayData.frames.length) {
+            const frame = replayData.frames[currentFrame];
+            drawPPFrame(frame);
+            document.getElementById('currentStep').textContent = frame.step;
+            document.getElementById('currentCaptures').textContent = frame.captures;
+
+            const allCaptured = frame.prey_alive.every(a => !a);
+            if (allCaptured) {
+                document.getElementById('gameStatus').textContent = 'CAPTURADA';
+                document.getElementById('gameStatus').style.color = 'var(--accent-green)';
+            } else {
+                document.getElementById('gameStatus').textContent = 'Cazando...';
+                document.getElementById('gameStatus').style.color = 'var(--accent-orange)';
+            }
+            currentFrame++;
+        } else {
+            playing = false;
+            document.getElementById('btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Reproducir';
+            document.getElementById('btnPlay').style.display = '';
+            document.getElementById('btnPause').style.display = 'none';
+            const status = document.getElementById('gameStatus');
+            const allCaptured = replayData.frames[replayData.frames.length-1].prey_alive.every(a => !a);
+            status.textContent = allCaptured ? 'CAPTURADA!' : 'ESCAPO';
+            status.style.color = allCaptured ? 'var(--accent-green)' : 'var(--accent-red)';
+            return;
+        }
+    }
+    animationId = requestAnimationFrame(animate);
+}
+function updateSpeed(val) { speed = parseInt(val); }
+
+// === SAVED REPLAYS SELECTOR ===
+const allReplays = {{ all_replays_data|safe }};
+const originalReplay = replayData ? JSON.parse(JSON.stringify(replayData)) : null;
+
+const selector = document.getElementById('replaySelector');
+if (selector && allReplays.length > 0) {
+    allReplays.forEach((r, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        const capText = r.captures > 0 ? 'CAPTURA' : 'escapo';
+        opt.textContent = `Ep. ${r.episode} | ${capText} | ${r.steps} pasos | Rew: ${r.reward}`;
+        selector.appendChild(opt);
+    });
+}
+
+function loadReplay(type) {
+    restartReplay();
+    if (type === 'best' && originalReplay) {
+        replayData = originalReplay;
+        drawPPFrame(replayData.frames[0]);
+        updateReplayInfo('Mejor (evaluacion)', replayData.frames.length);
+    }
+    if (selector) selector.value = '';
+    document.getElementById('btnBest')?.classList.add('active');
+}
+
+function loadSavedReplay(idx) {
+    if (idx === '' || !allReplays[idx]) return;
+    restartReplay();
+    const r = allReplays[idx];
+    replayData = { frames: r.frames, grid_size: originalReplay?.grid_size || 12, n_predators: originalReplay?.n_predators || 3, n_prey: originalReplay?.n_prey || 1 };
+    drawPPFrame(replayData.frames[0]);
+    const capText = r.captures > 0 ? 'CAPTURA' : 'Escapo';
+    updateReplayInfo(`Episodio ${r.episode} (${capText})`, replayData.frames.length);
+    document.getElementById('btnBest')?.classList.remove('active');
+}
+
+function updateReplayInfo(label, frames) {
+    const el = document.getElementById('replayInfo');
+    if (el) el.innerHTML = `<i class="bi bi-film me-1"></i><strong>${label}</strong> | ${frames} frames`;
+}
+
+{% if replay_data %}
+updateReplayInfo('Mejor (evaluacion)', replayData.frames.length);
+{% endif %}
+
+const form = document.getElementById('ppForm');
+if (form) {
+    form.addEventListener('submit', function() {
+        document.getElementById('trainBtn').disabled = true;
+        document.getElementById('trainBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Entrenando MARL...';
+        document.getElementById('trainingOverlay').style.display = 'block';
+    });
+}
+
+{% if chart_data %}
+const chartData = {{ chart_data|safe }};
+if (chartData) {
+    // Reward chart
+    new Chart(document.getElementById('rewardChart'), {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                { label: 'Reward por episodio', data: chartData.rewards, borderColor: 'rgba(88,166,255,0.12)', borderWidth: 1, pointRadius: 0, fill: false },
+                { label: 'Media movil', data: Array(chartData.ma_start-1).fill(null).concat(chartData.moving_avg), borderColor: '#f78166', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true, interaction: { intersect: false, mode: 'index' },
+            plugins: { legend: { labels: { color: '#8b949e' } }, tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1, titleColor: '#f0f6fc', bodyColor: '#8b949e' } },
+            scales: {
+                x: { title: { display: true, text: 'Episodio', color: '#8b949e' }, ticks: { color: '#8b949e', maxTicksLimit: 12 }, grid: { color: 'rgba(139,148,158,0.1)' } },
+                y: { title: { display: true, text: 'Reward', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: 'rgba(139,148,158,0.1)' } }
+            }
+        }
+    });
+
+    // Capture rate chart
+    new Chart(document.getElementById('captureChart'), {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                { label: 'Tasa de captura (ventana movil %)', data: chartData.capture_rate, borderColor: '#7ee787', borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: 'rgba(126,231,135,0.08)', tension: 0.3 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true, interaction: { intersect: false, mode: 'index' },
+            plugins: { legend: { labels: { color: '#8b949e' } }, tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1, titleColor: '#f0f6fc', bodyColor: '#8b949e' } },
+            scales: {
+                x: { title: { display: true, text: 'Episodio', color: '#8b949e' }, ticks: { color: '#8b949e', maxTicksLimit: 12 }, grid: { color: 'rgba(139,148,158,0.1)' } },
+                y: { title: { display: true, text: 'Tasa de Captura (%)', color: '#7ee787' }, ticks: { color: '#7ee787' }, grid: { color: 'rgba(139,148,158,0.1)' }, min: 0, max: 100 }
+            }
+        }
+    });
+}
+{% endif %}
+</script>
+{% endblock %}

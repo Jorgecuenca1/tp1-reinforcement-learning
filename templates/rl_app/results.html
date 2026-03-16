@@ -1,0 +1,233 @@
+{% extends "rl_app/base.html" %}
+{% block title %}Resultado #{{ run.pk }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'rl_app:home' %}" class="text-info text-decoration-none">Inicio</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'rl_app:technique_detail' run.technique.slug %}" class="text-info text-decoration-none">{{ run.technique.name }}</a></li>
+        <li class="breadcrumb-item active text-secondary">Resultado #{{ run.pk }}</li>
+    </ol>
+</nav>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">{{ run.technique.name }} <span class="text-secondary fw-normal">en</span> {{ run.problem.name }}</h2>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="pulse-dot {{ run.status }}"></span>
+            <span class="text-secondary">{{ run.get_status_display }}</span>
+            <span class="text-secondary">|</span>
+            <span class="text-secondary small">{{ run.created_at|date:"d/m/Y H:i" }}</span>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        {% if run.status == 'completed' %}
+        <a href="{% url 'rl_app:export_colab' run.pk %}" class="btn btn-outline-success">
+            <i class="bi bi-download me-1"></i>Exportar a Colab
+        </a>
+        {% endif %}
+        <a href="{% url 'rl_app:run_training' run.technique.slug run.problem.slug %}" class="btn btn-outline-info">
+            <i class="bi bi-arrow-repeat me-1"></i>Entrenar de nuevo
+        </a>
+    </div>
+</div>
+
+{% if run.status == 'failed' %}
+<!-- Error Display -->
+<div class="glass-card p-4 mb-4" style="border-color: var(--accent-red);">
+    <h5 class="text-danger fw-bold mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Error en el Entrenamiento</h5>
+    <div class="code-block" style="color: var(--accent-red);">{{ run.error_message }}</div>
+</div>
+{% endif %}
+
+{% if run.status == 'completed' %}
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+            <div class="stat-label mb-1">Mejor Reward</div>
+            <div class="stat-value" style="color: var(--accent-green); font-size: 1.6rem;">
+                {{ run.best_reward|floatformat:1 }}
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+            <div class="stat-label mb-1">Promedio (ult. 100)</div>
+            <div class="stat-value" style="color: var(--accent-blue); font-size: 1.6rem;">
+                {{ run.avg_reward_last_100|floatformat:1 }}
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+            <div class="stat-label mb-1">Tiempo Total</div>
+            <div class="stat-value" style="color: var(--accent-orange); font-size: 1.6rem;">
+                {{ run.duration_display }}
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+            <div class="stat-label mb-1">Episodios</div>
+            <div class="stat-value" style="color: var(--accent-purple); font-size: 1.6rem;">
+                {{ run.num_episodes }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Convergence Chart -->
+<div class="glass-card p-4 mb-4">
+    <h4 class="fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Grafico de Convergencia</h4>
+
+    {% if run.convergence_graph %}
+    <div class="text-center mb-3">
+        <img src="{{ run.convergence_graph.url }}" class="img-fluid rounded" alt="Convergence Graph"
+             style="max-height: 500px; border: 1px solid var(--border-color);">
+    </div>
+    {% endif %}
+
+    {% if chart_data %}
+    <canvas id="convergenceChart" style="max-height: 400px;"></canvas>
+    {% endif %}
+</div>
+
+<!-- Details Row -->
+<div class="row g-4">
+    <!-- Hyperparameters -->
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <h5 class="fw-bold mb-3"><i class="bi bi-sliders me-2"></i>Hiperparametros Utilizados</h5>
+            <table class="table table-sm">
+                <tbody>
+                    <tr><td class="text-secondary">Episodios</td><td class="font-monospace text-end">{{ run.num_episodes }}</td></tr>
+                    <tr><td class="text-secondary">Gamma</td><td class="font-monospace text-end">{{ run.gamma }}</td></tr>
+                    <tr><td class="text-secondary">Epsilon inicial</td><td class="font-monospace text-end">{{ run.epsilon }}</td></tr>
+                    <tr><td class="text-secondary">Epsilon decay</td><td class="font-monospace text-end">{{ run.epsilon_decay }}</td></tr>
+                    <tr><td class="text-secondary">Epsilon minimo</td><td class="font-monospace text-end">{{ run.epsilon_min }}</td></tr>
+                    {% if run.technique.algorithm_key == 'sarsa' or run.technique.algorithm_key == 'q_learning' %}
+                    <tr><td class="text-secondary">Alpha (LR)</td><td class="font-monospace text-end">{{ run.alpha }}</td></tr>
+                    {% endif %}
+                    {% if run.technique.algorithm_key == 'dqn' %}
+                    <tr><td class="text-secondary">Capas ocultas</td><td class="font-monospace text-end">{{ run.hidden_layers }}</td></tr>
+                    <tr><td class="text-secondary">Learning rate</td><td class="font-monospace text-end">{{ run.learning_rate_dqn }}</td></tr>
+                    <tr><td class="text-secondary">Batch size</td><td class="font-monospace text-end">{{ run.batch_size }}</td></tr>
+                    <tr><td class="text-secondary">Target update</td><td class="font-monospace text-end">{{ run.target_update }} ep.</td></tr>
+                    <tr><td class="text-secondary">Buffer size</td><td class="font-monospace text-end">{{ run.replay_buffer_size }}</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Extra Metrics -->
+    <div class="col-lg-6">
+        <div class="glass-card p-4 h-100">
+            <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Metricas Adicionales</h5>
+            <table class="table table-sm">
+                <tbody>
+                    {% if run.q_table_size %}
+                    <tr><td class="text-secondary">Tamano Q-table</td><td class="font-monospace text-end">{{ run.q_table_size }} pares (s,a)</td></tr>
+                    {% endif %}
+                    <tr><td class="text-secondary">Tiempo de ejecucion</td><td class="font-monospace text-end">{{ run.execution_time|floatformat:2 }}s</td></tr>
+                    {% for key, value in run.extra_metrics.items %}
+                    <tr><td class="text-secondary">{{ key }}</td><td class="font-monospace text-end">{{ value }}</td></tr>
+                    {% endfor %}
+                    {% if run.problem.reward_threshold %}
+                    <tr>
+                        <td class="text-secondary">Umbral de exito</td>
+                        <td class="font-monospace text-end">
+                            {% if run.avg_reward_last_100 >= run.problem.reward_threshold %}
+                            <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>{{ run.problem.reward_threshold|floatformat:1 }}</span>
+                            {% else %}
+                            <span class="text-warning"><i class="bi bi-dash-circle me-1"></i>{{ run.problem.reward_threshold|floatformat:1 }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <div class="mt-3">
+                <h6 class="text-secondary mb-2">Entorno</h6>
+                <div class="stat-card p-2">
+                    <code style="color: var(--accent-blue);">{{ run.problem.env_id }}</code>
+                    {% if run.problem.env_kwargs %}
+                    <span class="text-secondary small ms-2">({{ run.problem.get_env_kwargs_display }})</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if chart_data %}
+<script>
+const data = {{ chart_data|safe }};
+if (data) {
+    const ctx = document.getElementById('convergenceChart');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                {
+                    label: 'Reward por episodio',
+                    data: data.rewards,
+                    borderColor: 'rgba(88, 166, 255, 0.15)',
+                    backgroundColor: 'rgba(88, 166, 255, 0.03)',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    fill: true,
+                    tension: 0.1,
+                },
+                {
+                    label: `Media movil (ventana={{ run.moving_avg_window }})`,
+                    data: Array(data.ma_start - 1).fill(null).concat(data.moving_avg),
+                    borderColor: '#f78166',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.3,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { labels: { color: '#8b949e', font: { family: 'Inter' } } },
+                tooltip: {
+                    backgroundColor: '#161b22',
+                    borderColor: '#30363d',
+                    borderWidth: 1,
+                    titleColor: '#f0f6fc',
+                    bodyColor: '#8b949e',
+                    titleFont: { family: 'Inter', weight: 'bold' },
+                    bodyFont: { family: 'JetBrains Mono' },
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Episodio', color: '#8b949e', font: { family: 'Inter', weight: 'bold' } },
+                    ticks: { color: '#8b949e', maxTicksLimit: 15 },
+                    grid: { color: 'rgba(139,148,158,0.1)' }
+                },
+                y: {
+                    title: { display: true, text: 'Recompensa', color: '#8b949e', font: { family: 'Inter', weight: 'bold' } },
+                    ticks: { color: '#8b949e' },
+                    grid: { color: 'rgba(139,148,158,0.1)' }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

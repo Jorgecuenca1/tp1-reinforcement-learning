@@ -1,0 +1,165 @@
+{% extends "rl_app/base.html" %}
+{% block title %}Entrenar {{ technique.name }} - {{ problem.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'rl_app:home' %}" class="text-info text-decoration-none">Inicio</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'rl_app:technique_detail' technique.slug %}" class="text-info text-decoration-none">{{ technique.name }}</a></li>
+        <li class="breadcrumb-item active text-secondary">{{ problem.name }}</li>
+    </ol>
+</nav>
+
+<div class="row g-4">
+    <!-- Problem Info Column -->
+    <div class="col-lg-5">
+        <div class="glass-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <h3 class="fw-bold mb-0">{{ problem.name }}</h3>
+                <span class="badge badge-difficulty-{{ problem.difficulty }} px-3 py-2">{{ problem.get_difficulty_display }}</span>
+            </div>
+            <code class="d-block mb-3" style="color: var(--accent-blue); font-size: 0.95rem;">{{ problem.env_id }}</code>
+            <p class="text-secondary">{{ problem.description }}</p>
+
+            <div class="stat-card mb-3">
+                <h6 class="text-info mb-2"><i class="bi bi-diagram-3 me-1"></i>Espacio de Estados</h6>
+                <p class="small mb-0 text-light">{{ problem.state_space_info }}</p>
+            </div>
+            <div class="stat-card mb-3">
+                <h6 class="text-info mb-2"><i class="bi bi-joystick me-1"></i>Espacio de Acciones</h6>
+                <p class="small mb-0 text-light">{{ problem.action_space_info }}</p>
+            </div>
+
+            {% if problem.env_kwargs %}
+            <div class="stat-card mb-3">
+                <h6 class="text-info mb-2"><i class="bi bi-gear me-1"></i>Configuracion del Entorno</h6>
+                <p class="small mb-0 font-monospace text-light">{{ problem.get_env_kwargs_display }}</p>
+            </div>
+            {% endif %}
+
+            {% if problem.reward_threshold %}
+            <div class="stat-card">
+                <h6 class="text-info mb-2"><i class="bi bi-trophy me-1"></i>Umbral de Exito</h6>
+                <p class="small mb-0 text-light font-monospace">Reward >= {{ problem.reward_threshold|floatformat:1 }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Technique Summary -->
+        <div class="glass-card p-4">
+            <h5 class="fw-bold mb-2"><i class="bi bi-{{ technique.icon }} me-2"></i>{{ technique.name }}</h5>
+            <span class="badge {% if technique.category == 'monte_carlo' %}badge-mc{% elif technique.category == 'td' %}badge-td{% else %}badge-deep{% endif %} mb-3">{{ technique.get_category_display }}</span>
+            <p class="text-secondary small">{{ technique.description|truncatewords:50 }}</p>
+        </div>
+    </div>
+
+    <!-- Hyperparameters Form Column -->
+    <div class="col-lg-7">
+        <div class="glass-card p-4">
+            <h3 class="fw-bold mb-4"><i class="bi bi-sliders me-2"></i>Hiperparametros</h3>
+
+            <form method="post" id="trainingForm">
+                {% csrf_token %}
+
+                <!-- General Parameters -->
+                <h6 class="text-info mb-3 fw-bold">Parametros Generales</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Episodios</label>
+                        <input type="number" class="form-control" name="num_episodes" value="{{ defaults.num_episodes }}" min="100" max="1000000">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Gamma (descuento)</label>
+                        <input type="number" class="form-control" name="gamma" value="{{ defaults.gamma }}" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Epsilon inicial</label>
+                        <input type="number" class="form-control" name="epsilon" value="{{ defaults.epsilon }}" step="0.01" min="0" max="1">
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Epsilon Decay</label>
+                        <input type="number" class="form-control" name="epsilon_decay" value="{{ defaults.epsilon_decay }}" step="0.0001" min="0.9" max="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Epsilon Minimo</label>
+                        <input type="number" class="form-control" name="epsilon_min" value="{{ defaults.epsilon_min }}" step="0.001" min="0" max="0.5">
+                    </div>
+                </div>
+
+                {% if is_td %}
+                <!-- TD-specific Parameters -->
+                <h6 class="text-info mb-3 fw-bold">Parametros TD</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Alpha (tasa de aprendizaje)</label>
+                        <input type="number" class="form-control" name="alpha" value="{{ defaults.alpha }}" step="0.01" min="0.001" max="1">
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if is_dqn %}
+                <!-- DQN-specific Parameters -->
+                <h6 class="text-info mb-3 fw-bold">Parametros DQN</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Capas Ocultas</label>
+                        <input type="text" class="form-control" name="hidden_layers" value="{{ defaults.hidden_layers }}" placeholder="128,128">
+                        <div class="form-text text-secondary">Separadas por coma. Ej: 128,128 o 256,128,64</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Learning Rate</label>
+                        <input type="number" class="form-control" name="learning_rate_dqn" value="{{ defaults.learning_rate_dqn }}" step="0.0001" min="0.00001" max="0.1">
+                    </div>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Batch Size</label>
+                        <input type="number" class="form-control" name="batch_size" value="{{ defaults.batch_size }}" min="16" max="512">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Target Update (ep.)</label>
+                        <input type="number" class="form-control" name="target_update" value="{{ defaults.target_update }}" min="1" max="100">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Buffer Size</label>
+                        <input type="number" class="form-control" name="replay_buffer_size" value="{{ defaults.replay_buffer_size }}" min="1000" max="100000">
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr class="border-secondary my-4">
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'rl_app:technique_detail' technique.slug %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Volver
+                    </a>
+                    <button type="submit" class="btn btn-glow btn-lg" id="submitBtn">
+                        <i class="bi bi-play-fill me-1"></i>Iniciar Entrenamiento
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="glass-card p-5 text-center mt-4" style="display: none;">
+            <div class="spinner-glow mx-auto mb-4"></div>
+            <h4 class="fw-bold mb-2">Entrenando...</h4>
+            <p class="text-secondary mb-0">Ejecutando {{ technique.name }} en {{ problem.name }}</p>
+            <p class="text-secondary small">Esto puede tomar unos segundos o minutos segun la configuracion.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('trainingForm').addEventListener('submit', function(e) {
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Entrenando...';
+    document.getElementById('loadingOverlay').style.display = 'block';
+});
+</script>
+{% endblock %}
