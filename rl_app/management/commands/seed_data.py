@@ -374,7 +374,7 @@ class Command(BaseCommand):
         self.stdout.write("\nCargando problemas...")
 
         for p_data in PROBLEMS:
-            technique_slugs = p_data.pop("techniques")
+            technique_slugs = p_data.get("techniques", [])
             problem, created = Problem.objects.update_or_create(
                 slug=p_data["slug"],
                 env_id=p_data["env_id"],

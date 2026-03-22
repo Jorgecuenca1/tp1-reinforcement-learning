@@ -224,3 +224,7 @@ Cada algoritmo puede exportarse como un script `.py` independiente para ejecutar
 | Snake IA | 500 | ~30s |
 | MARL Predator-Prey | 500 | ~60s |
 | MC ES + Blackjack | 50000 | ~15s |
+
+Authors:
+Jorge Cuenca
+Fabian Sarmiento
