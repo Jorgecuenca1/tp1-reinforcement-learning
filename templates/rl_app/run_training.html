@@ -66,26 +66,26 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <label class="form-label">Episodios</label>
-                        <input type="number" class="form-control" name="num_episodes" value="{{ defaults.num_episodes }}" min="100" max="1000000">
+                        <input type="number" class="form-control" name="num_episodes" value="{{ defaults.num_episodes }}" min="100" max="1000000" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Gamma (descuento)</label>
-                        <input type="number" class="form-control" name="gamma" value="{{ defaults.gamma }}" step="0.01" min="0" max="1">
+                        <input type="number" class="form-control" name="gamma" value="{{ defaults.gamma }}" step="0.01" min="0" max="1" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Epsilon inicial</label>
-                        <input type="number" class="form-control" name="epsilon" value="{{ defaults.epsilon }}" step="0.01" min="0" max="1">
+                        <input type="number" class="form-control" name="epsilon" value="{{ defaults.epsilon }}" step="0.01" min="0" max="1" required>
                     </div>
                 </div>
 
                 <div class="row g-3 mb-4">
                     <div class="col-md-6">
                         <label class="form-label">Epsilon Decay</label>
-                        <input type="number" class="form-control" name="epsilon_decay" value="{{ defaults.epsilon_decay }}" step="0.0001" min="0.9" max="1">
+                        <input type="number" class="form-control" name="epsilon_decay" value="{{ defaults.epsilon_decay }}" step="0.0001" min="0.9" max="1" required>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Epsilon Minimo</label>
-                        <input type="number" class="form-control" name="epsilon_min" value="{{ defaults.epsilon_min }}" step="0.001" min="0" max="0.5">
+                        <input type="number" class="form-control" name="epsilon_min" value="{{ defaults.epsilon_min }}" step="0.001" min="0" max="0.5" required>
                     </div>
                 </div>
 
@@ -95,7 +95,7 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-6">
                         <label class="form-label">Alpha (tasa de aprendizaje)</label>
-                        <input type="number" class="form-control" name="alpha" value="{{ defaults.alpha }}" step="0.01" min="0.001" max="1">
+                        <input type="number" class="form-control" name="alpha" value="{{ defaults.alpha }}" step="0.01" min="0.001" max="1" required>
                     </div>
                 </div>
                 {% endif %}
@@ -106,26 +106,26 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-6">
                         <label class="form-label">Capas Ocultas</label>
-                        <input type="text" class="form-control" name="hidden_layers" value="{{ defaults.hidden_layers }}" placeholder="128,128">
+                        <input type="text" class="form-control" name="hidden_layers" value="{{ defaults.hidden_layers }}" placeholder="128,128" required>
                         <div class="form-text text-secondary">Separadas por coma. Ej: 128,128 o 256,128,64</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Learning Rate</label>
-                        <input type="number" class="form-control" name="learning_rate_dqn" value="{{ defaults.learning_rate_dqn }}" step="0.0001" min="0.00001" max="0.1">
+                        <input type="number" class="form-control" name="learning_rate_dqn" value="{{ defaults.learning_rate_dqn }}" step="0.0001" min="0.00001" max="0.1" required>
                     </div>
                 </div>
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <label class="form-label">Batch Size</label>
-                        <input type="number" class="form-control" name="batch_size" value="{{ defaults.batch_size }}" min="16" max="512">
+                        <input type="number" class="form-control" name="batch_size" value="{{ defaults.batch_size }}" min="16" max="512" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Target Update (ep.)</label>
-                        <input type="number" class="form-control" name="target_update" value="{{ defaults.target_update }}" min="1" max="100">
+                        <input type="number" class="form-control" name="target_update" value="{{ defaults.target_update }}" min="1" max="100" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Buffer Size</label>
-                        <input type="number" class="form-control" name="replay_buffer_size" value="{{ defaults.replay_buffer_size }}" min="1000" max="100000">
+                        <input type="number" class="form-control" name="replay_buffer_size" value="{{ defaults.replay_buffer_size }}" min="1000" max="100000" required>
                     </div>
                 </div>
                 {% endif %}

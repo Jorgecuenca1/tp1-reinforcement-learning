@@ -3,6 +3,7 @@ import time
 import os
 import traceback
 import numpy as np
+import logging
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
@@ -10,6 +11,31 @@ from django.conf import settings
 from .models import Technique, Problem, TrainingRun
 from .algorithms import monte_carlo_es, monte_carlo_is, sarsa, q_learning, dqn, snake_dqn, predator_prey_dqn
 from .algorithms.utils import plot_convergence
+
+
+logger = logging.getLogger(__name__)
+
+
+def _get_float(post_dict, key, default):
+    """Safely extract a float from POST data, returning default if key is absent or value is blank/invalid."""
+    val = post_dict.get(key, "").strip()
+    if not val:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _get_int(post_dict, key, default):
+    """Safely extract an int from POST data, returning default if key is absent or value is blank/invalid."""
+    val = post_dict.get(key, "").strip()
+    if not val:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
 
 
 ALGORITHM_MAP = {
@@ -54,17 +80,60 @@ def run_training(request, technique_slug, problem_slug):
 
     if request.method == "POST":
         run = TrainingRun(technique=technique, problem=problem)
-        run.num_episodes = int(request.POST.get("num_episodes", problem.default_episodes))
-        run.gamma = float(request.POST.get("gamma", 0.99))
-        run.alpha = float(request.POST.get("alpha", 0.1))
-        run.epsilon = float(request.POST.get("epsilon", 1.0))
-        run.epsilon_decay = float(request.POST.get("epsilon_decay", 0.9995))
-        run.epsilon_min = float(request.POST.get("epsilon_min", 0.01))
-        run.hidden_layers = request.POST.get("hidden_layers", "128,128")
-        run.batch_size = int(request.POST.get("batch_size", 64))
-        run.target_update = int(request.POST.get("target_update", 10))
-        run.replay_buffer_size = int(request.POST.get("replay_buffer_size", 10000))
-        run.learning_rate_dqn = float(request.POST.get("learning_rate_dqn", 0.001))
+        
+        # Safely parse all hyperparameters with validation fallback
+        try:
+            run.num_episodes = _get_int(request.POST, "num_episodes", problem.default_episodes)
+            run.gamma = _get_float(request.POST, "gamma", 0.99)
+            run.alpha = _get_float(request.POST, "alpha", 0.1)
+            run.epsilon = _get_float(request.POST, "epsilon", 1.0)
+            run.epsilon_decay = _get_float(request.POST, "epsilon_decay", 0.9995)
+            run.epsilon_min = _get_float(request.POST, "epsilon_min", 0.01)
+            run.hidden_layers = request.POST.get("hidden_layers", "128,128").strip()
+            run.batch_size = _get_int(request.POST, "batch_size", 64)
+            run.target_update = _get_int(request.POST, "target_update", 10)
+            run.replay_buffer_size = _get_int(request.POST, "replay_buffer_size", 10000)
+            run.learning_rate_dqn = _get_float(request.POST, "learning_rate_dqn", 0.001)
+            
+            # Validate hyperparameter ranges
+            if not (0 < run.gamma <= 1):
+                raise ValueError(f"Gamma debe estar entre (0, 1], obtuviste {run.gamma}")
+            if not (0 < run.alpha <= 1):
+                raise ValueError(f"Alpha debe estar entre (0, 1], obtuviste {run.alpha}")
+            if not (0 <= run.epsilon <= 1):
+                raise ValueError(f"Epsilon debe estar entre [0, 1], obtuviste {run.epsilon}")
+            if not (0 <= run.epsilon_decay <= 1):
+                raise ValueError(f"Epsilon decay debe estar entre [0, 1], obtuviste {run.epsilon_decay}")
+            if not (0 <= run.epsilon_min < run.epsilon):
+                raise ValueError(f"Epsilon min debe ser menor que epsilon inicial")
+            if run.num_episodes < 1:
+                raise ValueError(f"Episodios debe ser >= 1, obtuviste {run.num_episodes}")
+            if run.batch_size < 1:
+                raise ValueError(f"Batch size debe ser >= 1, obtuviste {run.batch_size}")
+            
+        except ValueError as e:
+            logger.warning(f"Invalid hyperparameters for {technique_slug}/{problem_slug}: {e}")
+            return render(request, "rl_app/run_training.html", {
+                "technique": technique,
+                "problem": problem,
+                "defaults": {
+                    "num_episodes": problem.default_episodes,
+                    "gamma": 0.99,
+                    "alpha": 0.5 if technique.algorithm_key in ("sarsa", "q_learning") else 0.1,
+                    "epsilon": 1.0,
+                    "epsilon_decay": 0.9995,
+                    "epsilon_min": 0.01,
+                    "hidden_layers": "128,128",
+                    "batch_size": 64,
+                    "target_update": 10,
+                    "replay_buffer_size": 10000,
+                    "learning_rate_dqn": 0.001,
+                },
+                "is_dqn": technique.algorithm_key == "dqn",
+                "is_td": technique.algorithm_key in ("sarsa", "q_learning"),
+                "error": f"⚠️ Parámetros inválidos: {e}",
+            })
+        
         run.status = "running"
         run.save()
 
