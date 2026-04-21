@@ -228,3 +228,4 @@ Cada algoritmo puede exportarse como un script `.py` independiente para ejecutar
 Authors:
 Jorge Cuenca
 Fabian Sarmiento
+Gustavo Rivas
